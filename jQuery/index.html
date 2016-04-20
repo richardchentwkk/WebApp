@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta name="author" content="Richard Chen">
+    <title>jQuery</title>
+    <script type="text/javascript" src="js/jquery-2.2.3.min.js"></script>
+    <!--Main control logic-->
+    <script type="text/javascript">
+    //Create jQuery Object.
+    window.onload = function() {
+        /*var $body = $(document.body);
+        $body.fadeOut();
+        //修改標籤
+        $body.html("<b>Hello</b>");*/
+
+        //CSS選擇器
+        //$("li").css("color", "blue");
+    };
+
+    function change() {
+        //$("li").css("color", "blue");
+        //$("#title").html("Popular movies");
+        //CSS選擇器
+        //$(".item").css("text-decoration", "underline");
+        //階層式選擇器
+        //$("ul>li").css("color", "red");
+        //ID選擇器
+        //設定兩個屬性
+        $("#popular").css({
+            "color": "red",
+            "font-weight": "bold"
+        });
+
+        $("#latest").css("color", "blue");
+    }
+    </script>
+</head>
+
+<body>
+    <h3 id="title">Favorite Movies</h3>
+    <ul id="popular">
+        <li class="item">The lord of the rings</li>
+        <li class="item">Pacific RIM</li>
+        <li>Superman</li>
+    </ul>
+    <h3 id="title">Latest Movies</h3>
+    <ul id="latest">
+        <li class="item">ABC</li>
+        <li class="item">DEF</li>
+        <li>Super</li>
+    </ul>
+    <button onclick="change();">Change</button>
+</body>
+
+</html>
