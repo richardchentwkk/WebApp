@@ -1,0 +1,11 @@
+.keyword {
+    color: red;
+}
+
+.tip {
+    border: 1px solid #880000;
+    background-color: #ffdddd;
+    opacity: 0.8;
+    position: absolute;
+    display: none;
+}
