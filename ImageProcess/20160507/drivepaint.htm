@@ -1,0 +1,215 @@
+<html>
+
+<head>
+    <title>Canvas</title>
+    <script type="text/javascript">
+    var cvs, ctx, svg;
+    window.onload = function() {
+        // 初始化程式，取得重要的全域物件
+        cvs = document.getElementById("cvs");
+        ctx = cvs.getContext("2d");
+        svg = document.getElementById("svg");
+        svg.style.left = cvs.offsetLeft + "px";
+        svg.style.top = cvs.offsetTop + "px";
+        // 由於 svg 覆蓋在 canvas 之上，事件必須由此觸發
+        svg.addEventListener("mousedown", mousedownSvg);
+    };
+
+    function mousedownSvg(e) {
+        var startX = e.clientX - cvs.offsetLeft;
+        var startY = e.clientY - cvs.offsetTop;
+        // 取得顏色
+        var fillColor = document.getElementById("fill-color").value;
+        // 建立 svg 中的方形元件，用來做操作時的預覽
+        var rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+        );
+        rect.setAttribute("fill", fillColor);
+        svg.appendChild(rect);
+        var move = function(e) {
+            var endX = e.clientX - cvs.offsetLeft;
+            var endY = e.clientY - cvs.offsetTop;
+            // 為了讓使用者可以往各個方向拉動，都能建立方型，所做的計算
+            var width = Math.abs(endX - startX);
+            var x = endX > startX ? startX : endX;
+            var height = Math.abs(endY - startY);
+            var y = endY > startY ? startY : endY;
+            // 更新 svg 中的方形原件
+            rect.setAttribute("x", x);
+            rect.setAttribute("y", y);
+            rect.setAttribute("width", width);
+            rect.setAttribute("height", height);
+        };
+        var end = function(e) {
+            var endX = e.clientX - cvs.offsetLeft;
+            var endY = e.clientY - cvs.offsetTop;
+            // 為了讓使用者可以往各個方向拉動，都能建立方型，所做的計算
+            var width = Math.abs(endX - startX);
+            var x = endX > startX ? startX : endX;
+            var height = Math.abs(endY - startY);
+            var y = endY > startY ? startY : endY;
+            // 正式將圖形話到 canvas 上面
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(x, y, width, height);
+            // 移除 svg 中的方形元件
+            svg.removeChild(rect);
+            // 移除事件處理器
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", end);
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", end);
+    }
+    // Filter
+    function grayscale() {
+        var pixels = ctx.getImageData(0, 0, cvs.width, cvs.height);
+        var data = pixels.data;
+        var r, g, b, a;
+        var value;
+        for (var i = 0; i < data.length; i += 4) {
+            r = data[i];
+            g = data[i + 1];
+            b = data[i + 2];
+            a = data[i + 3];
+            value = (r + g + b) / 3;
+            data[i] = data[i + 1] = data[i + 2] = value;
+        }
+        ctx.putImageData(pixels, 0, 0);
+    }
+    // File management
+    function loadFile(input) {
+        var file = input.files[0];
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.src = url;
+        img.onload = function() {
+            cvs.width = this.width;
+            cvs.height = this.height;
+            svg.setAttribute("width", this.width);
+            svg.setAttribute("height", this.height);
+            ctx.drawImage(this, 0, 0);
+        };
+    }
+
+    function openFile() {
+        var fileInput = document.getElementById("file-input");
+        fileInput.click();
+    }
+
+    function saveFile() {
+        var url = cvs.toDataURL("image/jpeg");
+        var link = document.getElementById("file-save");
+        link.href = url;
+        link.download = "image.jpg";
+        link.click();
+    };
+
+    var CLIENT_ID = "175100031166-s8qrbs2aig952hkfbctkst1dd4c47hbs.apps.googleusercontent.com";
+
+    var SCOPE = "https://www.googleapis.com/auth/drive";
+
+    var token = null;
+
+    function checkAuth() {
+        gapi.load('picker');
+        gapi.auth.authorize({
+            'client_id': CLIENT_ID,
+            'scope': SCOPE,
+            'immediate': true
+        }, handleAuthResult);
+    }
+
+    function auth() {
+        gapi.auth.authorize({
+            'client_id': CLIENT_ID,
+            'scope': SCOPE,
+            'immediate': false
+        }, handleAuthResult);
+    }
+
+    function handleAuthResult(result) {
+        if (result && !result.error) { //已授權
+            //alert(result.access_token);
+            token = result.access_token;
+        } else { //未授權
+            token = null;
+        }
+    }
+
+    //Google drive.
+    function openFileFromDrive() {
+        if (token == null) { //未授權，鼓勵授權
+            auth();
+        } else { //已授權，開啟檔案選擇器
+            createPicker();
+        }
+    }
+
+    function createPicker() {
+        if (token) {
+            var view = new google.picker.View(google.picker.ViewId.DOCS);
+            view.setMimeTypes("image/png,image/jpeg,image/jpg");
+            var picker = new google.picker.PickerBuilder()
+                .enableFeature(google.picker.Feature.NAV_HIDDEN)
+                .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                .setAppId("175100031166")
+                .setOAuthToken(token)
+                .addView(view)
+                .addView(new google.picker.DocsUploadView())
+                .setDeveloperKey("AIzaSyCkbZvRfCr6ZqGZtJuzwySmIBKjDb0xBMo")
+                .setCallback(pickerCallback)
+                .build();
+            picker.setVisible(true);
+        }
+    }
+
+    function pickerCallback(data) {
+        if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+            var file = data[google.picker.Response.DOCUMENTS][0];
+            console.log(file.id);
+            var fileId = file[google.picker.Document.ID]
+                //根據ID下載檔案，使用AJAX
+            downloadFile(fileId);
+
+        }
+    }
+    /* Download file flow. */
+    function downloadFile(fileId) {
+        var req = new XMLHttpRequest();
+        req.open("get", "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+        //提供token才有權限下載
+        req.setRequestHeader("Authorization", "Bearer " + token);
+        //回應型態改為array buffer
+        req.responseType = "arraybuffer";
+        req.send(); // Send request.
+        req.onload = function() { //Waiting for response.
+            var blob = new Blob([this.response]);
+            var img = new Image();
+            img.src = URL.createObjectURL(blob);
+            img.crossOrigin = "Anonymous"; //跨網域載入圖片，開放權限
+            img.onload = function() {
+                ctx.clearRect(0, 0, cvs.width, cvs.height);
+                ctx.drawImage(this, 0, 0, cvs.width, cvs.height);
+            };
+        };
+    }
+    </script>
+    <script type="text/javascript" src="https://apis.google.com/js/api.js"></script>
+    <script src="https://apis.google.com/js/client.js?onload=checkAuth"></script>
+</head>
+
+<body>
+    <button onclick="openFileFromDrive()">Open from Google Drive</button>
+    <button onclick="openFile();">Open</button>
+    <button onclick="saveFile();">Save</button>
+    <a id="file-save" style="display:none;">Download</a>
+    <input id="file-input" type="file" onchange="loadFile(this);" style="display:none" />
+    <input type="color" id="fill-color" />
+    <button onclick="grayscale();">Grayscale</button>
+    <hr/>
+    <canvas style="border:1px solid black" width="800" height="600" id="cvs"></canvas>
+    <svg id="svg" width="800" height="600" style="position:absolute;border:1px solid black"></svg>
+</body>
+
+</html>
