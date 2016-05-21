@@ -1,0 +1,259 @@
+<html>
+
+<head>
+    <title>Canvas</title>
+    <script type="text/javascript">
+    var cvs, ctx, svg;
+    window.onload = function() {
+        // 初始化程式，取得重要的全域物件
+        cvs = document.getElementById("cvs");
+        ctx = cvs.getContext("2d");
+        svg = document.getElementById("svg");
+        svg.style.left = cvs.offsetLeft + "px";
+        svg.style.top = cvs.offsetTop + "px";
+        // 由於 svg 覆蓋在 canvas 之上，事件必須由此觸發
+        svg.addEventListener("mousedown", mousedownSvg);
+    };
+
+    function mousedownSvg(e) {
+        var startX = e.clientX - cvs.offsetLeft;
+        var startY = e.clientY - cvs.offsetTop;
+        // 取得顏色
+        var fillColor = document.getElementById("fill-color").value;
+        // 建立 svg 中的方形元件，用來做操作時的預覽
+        var rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+        );
+        rect.setAttribute("fill", fillColor);
+        svg.appendChild(rect);
+        var move = function(e) {
+            var endX = e.clientX - cvs.offsetLeft;
+            var endY = e.clientY - cvs.offsetTop;
+            // 為了讓使用者可以往各個方向拉動，都能建立方型，所做的計算
+            var width = Math.abs(endX - startX);
+            var x = endX > startX ? startX : endX;
+            var height = Math.abs(endY - startY);
+            var y = endY > startY ? startY : endY;
+            // 更新 svg 中的方形原件
+            rect.setAttribute("x", x);
+            rect.setAttribute("y", y);
+            rect.setAttribute("width", width);
+            rect.setAttribute("height", height);
+        };
+        var end = function(e) {
+            var endX = e.clientX - cvs.offsetLeft;
+            var endY = e.clientY - cvs.offsetTop;
+            // 為了讓使用者可以往各個方向拉動，都能建立方型，所做的計算
+            var width = Math.abs(endX - startX);
+            var x = endX > startX ? startX : endX;
+            var height = Math.abs(endY - startY);
+            var y = endY > startY ? startY : endY;
+            // 正式將圖形話到 canvas 上面
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(x, y, width, height);
+            // 移除 svg 中的方形元件
+            svg.removeChild(rect);
+            // 移除事件處理器
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", end);
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", end);
+    }
+    // Filter
+    function grayscale() {
+        var pixels = ctx.getImageData(0, 0, cvs.width, cvs.height);
+        var data = pixels.data;
+        var r, g, b, a;
+        var value;
+        for (var i = 0; i < data.length; i += 4) {
+            r = data[i];
+            g = data[i + 1];
+            b = data[i + 2];
+            a = data[i + 3];
+            value = (r + g + b) / 3;
+            data[i] = data[i + 1] = data[i + 2] = value;
+        }
+        ctx.putImageData(pixels, 0, 0);
+    }
+    // File management
+    function loadFile(input) {
+        var file = input.files[0];
+        var url = URL.createObjectURL(file);
+        loadImage(url);
+    }
+
+    function loadImage(url) {
+        var img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = url;
+        img.onload = function() {
+            cvs.width = this.width;
+            cvs.height = this.height;
+            svg.setAttribute("width", this.width);
+            svg.setAttribute("height", this.height);
+            ctx.drawImage(this, 0, 0);
+        };
+    }
+
+    function openFile() {
+        var fileInput = document.getElementById("file-input");
+        fileInput.click();
+    }
+
+    function saveFile() {
+        var url = cvs.toDataURL("image/jpeg");
+        var link = document.getElementById("file-save");
+        link.href = url;
+        link.download = "image.jpg";
+        link.click();
+    };
+    // Google Drive and Picker
+    // Developer Key for Picker API
+    var DEVELOPER_KEY = "AIzaSyCkbZvRfCr6ZqGZtJuzwySmIBKjDb0xBMo";
+    // Client Id for Drive API
+    var CLIENT_ID = "175100031166-s8qrbs2aig952hkfbctkst1dd4c47hbs.apps.googleusercontent.com";
+    // 權限設定
+    var SCOPES = ["https://www.googleapis.com/auth/drive"];
+    // 能用來存取資料的 Access Token 存放位置
+    var token = null;
+    // 啟動 Google 相關的服務
+    function initGoogle() {
+        gapi.client.load("drive", "v3"); // 立刻載入 Drive API
+        gapi.load("picker"); // 立刻載入 Picker API
+        gapi.auth.authorize({ // 立刻進行授權偵測
+            "client_id": CLIENT_ID,
+            "scope": SCOPES.join(" "),
+            "immediate": true
+        }, handleAuthResult);
+    }
+    // 用來進行鼓勵使用者授權的程序，與偵測的差別在 immediate 的設定
+    function authorize() {
+        gapi.auth.authorize({
+            "client_id": CLIENT_ID,
+            "scope": SCOPES.join(" "),
+            "immediate": false
+        }, handleAuthResult);
+    }
+    // 授權程序的後續處理
+    function handleAuthResult(authResult) {
+        if (authResult && !authResult.error) { // 授權成功
+            token = authResult.access_token; // 取得 Access Token 並紀錄下來
+        } else { // 授權失敗
+            token = null;
+        }
+    }
+    // 點擊 Open from Drive，是下方程式的起始點
+    function clickOpenDrive() {
+        if (token == null) { // 尚未授權，鼓勵使用者授權
+            authorize();
+            return;
+        }
+        startPicker();
+    }
+    // 設定並開啟 Picker(雲端檔案選擇器) 視窗
+    function startPicker() {
+        var picker = new google.picker.PickerBuilder().
+        addView(google.picker.ViewId.DOCS_IMAGES).
+        setOAuthToken(token).
+        setDeveloperKey(DEVELOPER_KEY).
+        setCallback(pickerCallback).
+        build();
+        picker.setVisible(true);
+    }
+    // 取得使用者的選擇
+    function pickerCallback(data) {
+        if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+            var doc = data[google.picker.Response.DOCUMENTS][0];
+            var id = doc[google.picker.Document.ID];
+            // 利用 Google Drive API 下載檔案
+            downloadImage(id);
+        }
+    }
+    // 下載圖片
+    function downloadImage(fileId) {
+        var req = new XMLHttpRequest();
+        req.open("get", "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+        req.responseType = "arraybuffer";
+        req.setRequestHeader("Authorization", "Bearer " + token);
+        req.onload = function() {
+            var blob = new Blob([this.response]);
+            var src = URL.createObjectURL(blob);
+            loadImage(src);
+        };
+        req.send();
+    }
+    // 點擊 Save to Drive，是下方程式的起始點
+    function clickSaveDrive() {
+        if (token == null) {
+            authorize();
+            return;
+        }
+        uploadFile("New Image", function() {
+            alert("Uploaded");
+        });
+    }
+    // 利用 Multipart 格式上傳檔案，檔案內容需使用 base64 編碼處理
+    function uploadFile(filename, callback) {
+        // 準備 Multipart 格式的細節
+        var boundary = "-------314159265358979323846";
+        var delimiter = "\r\n--" + boundary + "\r\n";
+        var close_delim = "\r\n--" + boundary + "--";
+
+        // 準備一些自訂的檔案資訊
+        var contentType = "image/jpeg";
+        var metadata = {
+            "name": filename,
+            "mimeType": contentType
+        };
+
+        // 準備要上傳的圖檔資料，編碼成 base64 字串
+        var base64Data = cvs.toDataURL("image/jpeg").replace("data:image/jpeg;base64,", "");
+
+        // 組織出正確的 Multipart 格式
+        var multipartRequestBody =
+            delimiter +
+            "Content-Type: application/json\r\n\r\n" +
+            JSON.stringify(metadata) +
+            delimiter +
+            "Content-Type: " + contentType + "\r\n" +
+            "Content-Transfer-Encoding: base64\r\n" +
+            "\r\n" +
+            base64Data +
+            close_delim;
+
+        // 利用 Google Drive API 將檔案上傳至 Drive 伺服器
+        var request = gapi.client.request({
+            "path": "/upload/drive/v3/files",
+            "method": "POST",
+            "params": {
+                "uploadType": "multipart"
+            },
+            "headers": {
+                "Content-Type": "multipart/mixed; boundary=\"" + boundary + "\""
+            },
+            "body": multipartRequestBody
+        });
+        request.execute(callback);
+    }
+    </script>
+    <script type="text/javascript" src="https://apis.google.com/js/api.js"></script>
+    <script type="text/javascript" src="https://apis.google.com/js/client.js?onload=initGoogle"></script>
+</head>
+
+<body>
+    <button onclick="clickOpenDrive()">Open from Drive</button>
+    <button onclick="clickSaveDrive()">Save to Drive</button>
+    <button onclick="openFile();">Open</button>
+    <button onclick="saveFile();">Save</button>
+    <a id="file-save" style="display:none;">Download</a>
+    <input id="file-input" type="file" onchange="loadFile(this);" style="display:none" />
+    <input type="color" id="fill-color" />
+    <button onclick="grayscale();">Grayscale</button>
+    <hr/>
+    <canvas style="border:1px solid black" width="800" height="600" id="cvs"></canvas>
+    <svg id="svg" width="800" height="600" style="position:absolute;border:1px solid black"></svg>
+</body>
+
+</html>
